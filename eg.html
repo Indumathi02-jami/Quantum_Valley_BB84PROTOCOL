@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Internship Recommendation</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    form { margin-bottom: 20px; }
+    input, button { margin: 5px 0; padding: 8px; width: 300px; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Upload Resume for Internship Recommendations</h1>
+
+  <!-- Resume Upload -->
+  <form id="resumeForm">
+    <input type="file" id="resume" name="resume" accept=".pdf,.docx,.txt" required />
+    <button type="submit">Upload Resume</button>
+  </form>
+
+  <!-- Auto-filled Candidate Profile -->
+  <h2>Candidate Profile</h2>
+  <form id="profileForm">
+    <label for="skills">Skills:</label>
+    <input type="text" id="skills" name="skills" placeholder="e.g. python, sql, communication">
+
+    <label for="sector">Preferred Sector:</label>
+    <input type="text" id="sector" name="sector" placeholder="e.g. IT Services">
+
+    <label for="location">Preferred Location:</label>
+    <input type="text" id="location" name="location" placeholder="e.g. Bangalore">
+
+    <label for="education">Education:</label>
+    <input type="text" id="education" name="education" placeholder="e.g. B.Tech">
+
+    <button type="submit">Get Recommendations</button>
+  </form>
+
+  <!-- Recommendations -->
+  <h2>Top Recommendations</h2>
+  <div id="recommendations"></div>
+
+  <script>
+    // Resume Upload → Auto-fill
+    document.getElementById("resumeForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      formData.append("resume", document.getElementById("resume").files[0]);
+
+      try {
+        const res = await fetch("/api/extract-resume", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById("skills").value = data.extracted_data.skills;
+          document.getElementById("education").value = data.extracted_data.education;
+        } else {
+          alert("Error: " + data.error);
+        }
+      } catch (err) {
+        console.error("Upload failed", err);
+      }
+    });
+
+    // Profile Form → Recommendations
+    document.getElementById("profileForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const profile = {
+        skills: document.getElementById("skills").value,
+        sector: document.getElementById("sector").value,
+        location: document.getElementById("location").value,
+        education: document.getElementById("education").value
+      };
+
+      try {
+        const res = await fetch("/api/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(profile)
+        });
+        const data = await res.json();
+
+        const recDiv = document.getElementById("recommendations");
+        recDiv.innerHTML = ""; // clear old
+        if (data.success) {
+          data.recommendations.forEach(rec => {
+            const box = document.createElement("div");
+            box.style.border = "1px solid #ccc";
+            box.style.padding = "10px";
+            box.style.margin = "10px 0";
+            box.style.background = rec.recommendation.bg;
+
+            box.innerHTML = `
+              <h3>${rec.internship.title} (${rec.recommendation.icon} ${rec.recommendation.level})</h3>
+              <p><b>Company:</b> ${rec.internship.company}</p>
+              <p><b>Location:</b> ${rec.internship.location}</p>
+              <p><b>Similarity Score:</b> ${(rec.similarity_score*100).toFixed(1)}%</p>
+              <p>${rec.explanation}</p>
+            `;
+            recDiv.appendChild(box);
+          });
+        } else {
+          recDiv.innerHTML = "<p style='color:red;'>Error: " + data.error + "</p>";
+        }
+      } catch (err) {
+        console.error("Recommendation failed", err);
+      }
+    });
+  </script>
+</body>
+</html>
